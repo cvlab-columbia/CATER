@@ -372,7 +372,7 @@ def setup_scene(
     }
 
     # Put a plane on the ground so we can compute cardinal directions
-    bpy.ops.mesh.primitive_plane_add(radius=5)
+    bpy.ops.mesh.primitive_plane_add(size=5)
     plane = bpy.context.object
 
     # Add random jitter to camera position
@@ -384,9 +384,9 @@ def setup_scene(
     camera = bpy.data.objects['Camera']
 
     plane_normal = plane.data.vertices[0].normal
-    cam_behind = camera.matrix_world.to_quaternion() * Vector((0, 0, -1))
-    cam_left = camera.matrix_world.to_quaternion() * Vector((-1, 0, 0))
-    cam_up = camera.matrix_world.to_quaternion() * Vector((0, 1, 0))
+    cam_behind = camera.matrix_world.to_quaternion() @ Vector((0, 0, -1))
+    cam_left = camera.matrix_world.to_quaternion() @ Vector((-1, 0, 0))
+    cam_up = camera.matrix_world.to_quaternion() @ Vector((0, 1, 0))
     plane_behind = (cam_behind - cam_behind.project(plane_normal)).normalized()
     plane_left = (cam_left - cam_left.project(plane_normal)).normalized()
     plane_up = cam_up.project(plane_normal).normalized()
@@ -470,7 +470,7 @@ def render_scene(
         if bpy.app.version < (2, 78, 0):
             bpy.context.user_preferences.system.compute_device_type = 'CUDA'
             bpy.context.user_preferences.system.compute_device = 'CUDA_0'
-        else:
+        elif bpy.app.version < (2,80,0):
             cycles_prefs = bpy.context.user_preferences.addons[
                 'cycles'].preferences
             cycles_prefs.compute_device_type = 'CUDA'
@@ -485,6 +485,9 @@ def render_scene(
             #           'running singularity.'.format(
             #               len(cycles_prefs.devices),
             #               cycles_prefs.devices[1]))
+        else:
+            cycles_prefs = bpy.context.preferences.addons['cycles'].preferences
+            cycles_prefs.compute_device_type = 'CUDA'
 
     # Some CYCLES-specific stuff
     bpy.data.worlds['World'].cycles.sample_as_light = True
@@ -538,13 +541,16 @@ def print_camera_matrix():
     camera = bpy.data.objects['Camera']
     render = bpy.context.scene.render
     modelview_matrix = camera.matrix_world.inverted()
+    #2.80 and up requries depsgraph
+    depsgraph = bpy.context.evaluated_depsgraph_get()
     projection_matrix = camera.calc_matrix_camera(
-        render.resolution_x,
-        render.resolution_y,
-        render.pixel_aspect_x,
-        render.pixel_aspect_y,
+        depsgraph,
+        x=render.resolution_x,
+        y=render.resolution_y,
+        scale_x=render.pixel_aspect_x,
+        scale_y=render.pixel_aspect_y,
     )
-    final_mat = projection_matrix * modelview_matrix
+    final_mat = projection_matrix @ modelview_matrix
     print('Overall camera matrix:', final_mat)
 
 

@@ -3,8 +3,10 @@ import subprocess
 import argparse
 import numpy as np
 
-DATA_MOUNT_POINT = '/home/rgirdhar/singularity_mounts/data'
-OUT_DIR = 'Test'  # only running to print out the camera matrix
+BLENDER_PATH_2_79 = '/local/vondrick/skm2167/blender-2.79-linux-glibc219-x86_64/blender' 
+BLENDER_PATH_2_81 = '/local/vondrick/skm2167/blender-2.81a-linux-glibc217-x86_64/blender'
+BLENDER_PATH = BLENDER_PATH_2_81
+OUT_PATH = '/local/vondrick/skm2167/CATER_OUT'
 CAM_MOTION = False
 MAX_MOTIONS = 2
 
@@ -33,8 +35,6 @@ def run_blender(gpu_id):
     subprocess.call('sleep {}'.format(sleep_time), shell=True)
     cmd = '''
         CUDA_VISIBLE_DEVICES="{gpu_id}" \
-            singularity exec --nv -B /data:{data_mount_point} \
-            /home/rgirdhar/Software/singularity/spec_v0.img \
             {blender_path} \
             data/base_scene.blend \
             --background --python render_videos.py -- \
@@ -49,9 +49,8 @@ def run_blender(gpu_id):
         gpu_id=gpu_id,
         cam_motion='--random_camera' if CAM_MOTION else '',
         max_motions='--max_motions={}'.format(MAX_MOTIONS),
-        blender_path='/home/rgirdhar/Software/graphics/blender/blender-2.79b-linux-glibc219-x86_64/blender',  # noQA
-        output_dir='{}/rgirdhar/CATER-release/{}/'.format(DATA_MOUNT_POINT, OUT_DIR),  # noQA
-        data_mount_point=DATA_MOUNT_POINT)
+        blender_path=BLENDER_PATH,
+        output_dir=OUT_PATH)
     print('Running {}'.format(final_cmd))
     subprocess.call(final_cmd, shell=True)
 
