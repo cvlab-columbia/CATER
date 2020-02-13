@@ -488,6 +488,11 @@ def render_scene(
         else:
             cycles_prefs = bpy.context.preferences.addons['cycles'].preferences
             cycles_prefs.compute_device_type = 'CUDA'
+            cuda_devices, opencl_devices = bpy.context.preferences.addons['cycles'].preferences.get_devices()
+            for device in cuda_devices:
+                if device.type != 'CPU':
+                    print(f'Activating {device.name}')
+                    device.use = True
 
     # Some CYCLES-specific stuff
     bpy.data.worlds['World'].cycles.sample_as_light = True
@@ -513,6 +518,11 @@ def render_scene(
         bpy.ops.wm.save_as_mainfile(filepath=output_blendfile)
     max_num_render_trials = 10
     if args.render:
+        print("Using engine: {}".format(bpy.context.scene.render.engine))
+        print("Using device: {}".format(bpy.context.scene.cycles.device))
+        print("Using backend (if using Cycles): {}".format(bpy.context.preferences.addons['cycles'].preferences.compute_device_type))
+        cuda_devices, opencl_devices = bpy.context.preferences.addons['cycles'].preferences.get_devices()
+        print("Available devices: {}".format(cuda_devices))
         while max_num_render_trials > 0:
             try:
                 if args.suppress_blender_logs:
