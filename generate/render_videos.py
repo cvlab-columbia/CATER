@@ -5,6 +5,7 @@
 # LICENSE file in the root directory of this source tree. An additional grant
 # of patent rights can be found in the PATENTS file in the same directory.
 
+
 from __future__ import print_function
 import math
 import sys
@@ -15,10 +16,12 @@ import os
 from datetime import datetime as dt
 import numpy as np
 import errno
+
+sys.path.append('/local/vondrick/skm2167/CATER_NEW/generate')
+
 from movement_record import MovementRecord
 import logging
 import itertools
-
 
 """
 Renders random scenes using Blender, each with with a random number of objects;
@@ -242,8 +245,8 @@ parser.add_argument(
     "-v", "--verbose", help="increase output verbosity",
     action="store_true")
 
-random.seed(42)
-np.random.seed(42)
+#random.seed(42)
+#np.random.seed(42)
 
 
 def mkdir_p(path):
@@ -327,8 +330,8 @@ def main(args):
                 raise e
             logging.warning('Didnt work for {} due to {}. Ignoring for now..'
                             .format(img_path, e))
-        unlock(img_path)
-        logging.info('Done for {}'.format(img_path))
+        #unlock(img_path)
+        #logging.info('Done for {}'.format(img_path))
 
     # After rendering all images, combine the JSON files for each scene into a
     # single JSON file.
@@ -417,20 +420,20 @@ def setup_scene(
             bpy.data.objects['Lamp_Fill'].location[i] += rand(
                 args.fill_light_jitter)
 
-    # objects = cup_game(scene_struct, num_objects, args, camera)
-    objects, blender_objects = add_random_objects(
-        scene_struct, num_objects, args, camera)
+    #objects = cup_game(scene_struct, num_objects, args, camera)
+    objects, blender_objects = add_random_objects(scene_struct, num_objects, args, camera)
     record = MovementRecord(blender_objects, args.num_frames)
     actions.random_objects_movements(
         objects, blender_objects, args, args.num_frames, args.min_dist,
         record, max_motions=args.max_motions)
-
     # Render the scene and dump the scene data structure
     scene_struct['objects'] = objects
     scene_struct['relationships'] = compute_all_relationships(scene_struct)
     scene_struct['movements'] = record.get_dict()
     with open(output_scene, 'w') as f:
         json.dump(scene_struct, f, indent=2)
+    
+    return record
 
 
 def render_scene(
@@ -488,10 +491,9 @@ def render_scene(
         else:
             cycles_prefs = bpy.context.preferences.addons['cycles'].preferences
             cycles_prefs.compute_device_type = 'CUDA'
-            cuda_devices, opencl_devices = bpy.context.preferences.addons['cycles'].preferences.get_devices()
+            cuda_devices = bpy.context.preferences.addons['cycles'].preferences.devices
             for device in cuda_devices:
                 if device.type != 'CPU':
-                    print(f'Activating {device.name}')
                     device.use = True
 
     # Some CYCLES-specific stuff
@@ -503,12 +505,13 @@ def render_scene(
     if args.cpu is False:
         bpy.context.scene.cycles.device = 'GPU'
 
+    record = None
     if output_blendfile is not None and os.path.exists(output_blendfile):
         logging.info('Loading pre-defined BLEND file from {}'.format(
             output_blendfile))
         bpy.ops.wm.open_mainfile(filepath=output_blendfile)
     else:
-        setup_scene(
+        record = setup_scene(
             args, num_objects, output_index, output_split,
             output_image, output_scene)
     print_camera_matrix()
@@ -517,13 +520,15 @@ def render_scene(
     if output_blendfile is not None and not os.path.exists(output_blendfile):
         bpy.ops.wm.save_as_mainfile(filepath=output_blendfile)
     max_num_render_trials = 10
+
     if args.render:
         print("Using engine: {}".format(bpy.context.scene.render.engine))
         print("Using device: {}".format(bpy.context.scene.cycles.device))
         print("Using backend (if using Cycles): {}".format(bpy.context.preferences.addons['cycles'].preferences.compute_device_type))
-        cuda_devices, opencl_devices = bpy.context.preferences.addons['cycles'].preferences.get_devices()
+        cuda_devices = bpy.context.preferences.addons['cycles'].preferences.devices
         print("Available devices: {}".format(cuda_devices))
         while max_num_render_trials > 0:
+            print("trying to render")
             try:
                 if args.suppress_blender_logs:
                     # redirect output to log file
@@ -544,6 +549,58 @@ def render_scene(
                 max_num_render_trials -= 1
                 print(e)
 
+    unlock(output_image)
+    logging.info('Done for {}'.format(output_image))
+    # Make container objects invisible and re-render
+   
+
+    for o in bpy.context.scene.objects:
+        if o in record.contains:
+            print("{} found in contains".format(o))
+
+            for frame in record.contains[o]:
+                if frame:
+                    o.hide_viewport = True
+                    o.hide_render = True
+                    print("{} is now hidden".format(o))
+                    break
+
+
+    render_args.filepath = output_image.replace(args.split, "TRACKING")
+    lock(render_args.filepath)
+
+    if args.render:
+        print("rendering second version")
+        print("Using engine: {}".format(bpy.context.scene.render.engine))
+        print("Using device: {}".format(bpy.context.scene.cycles.device))
+        print("Using backend (if using Cycles): {}".format(bpy.context.preferences.addons['cycles'].preferences.compute_device_type))
+        cuda_devices = bpy.context.preferences.addons['cycles'].preferences.devices
+        print("Available devices: {}".format(cuda_devices))
+        while max_num_render_trials > 0:
+            print("trying to render")
+            try:
+                if args.suppress_blender_logs:
+                    # redirect output to log file
+                    logfile = '/dev/null'
+                    open(logfile, 'a').close()
+                    old = os.dup(1)
+                    sys.stdout.flush()
+                    os.close(1)
+                    os.open(logfile, os.O_WRONLY)
+                bpy.ops.render.render(animation=True)
+                if args.suppress_blender_logs:
+                    # disable output redirection
+                    os.close(1)
+                    os.dup(old)
+                    os.close(old)
+                break
+            except Exception as e:
+                max_num_render_trials -= 1
+                print(e)
+
+
+    unlock(render_args.filepath)
+    logging.info('Done for {}'.format(render_args.filepath))
 
 def print_camera_matrix():
     # from

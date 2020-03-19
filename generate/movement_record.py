@@ -52,12 +52,36 @@ class MovementRecord:
                         obj, self.contains[obj][frame_id], frame_id,
                         other_obj, start_frame, end_frame)
                 self.contains[obj][frame_id] = other_obj
+
+                # (vtw2108) for the purpose of creating a dataset
+                # that has no compound containments
+                
+                obj["Contains"] = True
+                other_obj["Contained"] = True
+
+
+                # (vtw2108) for the purpose of creating a dataset
+                # that has no object as both a container and an 
+                # occluded object throught the entire video
+
+                obj["Container"] = True
+                other_obj["Container"] = False
+
+
             logging.debug('{} contains {} as of {}'.format(
                 obj, other_obj, start_frame))
         elif action.__name__ == '_pick_place':
             # If something was contained, it will no longer be
+
+            if "Contains" in obj:
+                obj["Contains"] = False
+                self.contains[obj][end_frame]["Contained"] = False
+
+
             for frame_id in range(end_frame, self.total_frames + 1):
                 self.contains[obj][frame_id] = None
+
+
 
     def get_dict(self):
         """

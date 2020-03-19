@@ -97,6 +97,7 @@ def add_movements_multiObj_try(objects, start_frame, all_obj_locations,
                             new_end_frame,
                             min_dist):
             continue
+
         # Ideally need to do 2 steps: simulate motion and then actually move,
         # but for simple case it is fine since I check for collisions at the
         # end points, and at a time, only one object is moved.
@@ -132,7 +133,7 @@ def add_movements_multiObj_try(objects, start_frame, all_obj_locations,
             assert len(objects[i]) == len(all_obj_locations[i]), \
                 '{} vs {}'.format(len(objects[i]), len(all_obj_locations[i]))
         assert_no_collisions(all_obj_locations, objects, min_dist, record)
-
+        
         # add single object movements for the rest of the objects in this time
         new_end_frame_singleObjMotion = add_movements_singleObj(
             objects,
@@ -155,6 +156,14 @@ def _can_contain(ob1, ob2, other_objects, all_obj_locations, end_frame,
     assert len(other_objects) == len(all_obj_locations)
     # Only cones do the contains, and can contain spl or smaller sphere/cones,
     # cylinders/cubes are too large
+
+
+    if ("Container" in ob1[0][1] and not ob1[0][1]["Container"]) or ("Container" in ob2[0][1] and ob2[0][1]["Container"]):
+        return False
+
+    if ("Contains" in ob1[0][1] and ob1[0][1]["Contains"]) or ("Contained" in ob2[0][1] and ob2[0][1]["Contained"]):
+        return False
+
     if (len(ob1) == 1 and ob1[0][0]['sized'] > ob2[0][0]['sized'] and
             ob1[0][0]['shape'] == 'cone' and
             ob2[0][0]['shape'] in ['cone', 'sphere', 'spl']):
@@ -241,6 +250,7 @@ def add_movements_singleObj(objects, start_frame, all_obj_locations, min_dist,
                     len(all_obj_locations[obid][i]) - new_end_frame)
         assert_no_collisions(all_obj_locations, objects, min_dist, record,
                              ignore_obids=ignore_obids)
+    
     # split the objects that were split
     obids_split = [obid for i, obid in enumerate(obj_order) if splits[i]]
     final_objects = []

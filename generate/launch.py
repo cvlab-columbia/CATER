@@ -7,9 +7,9 @@ BLENDER_PATH_2_79 = '/local/vondrick/skm2167/blender-2.79-linux-glibc219-x86_64/
 BLENDER_PATH_2_81 = '/local/vondrick/skm2167/blender-2.81a-linux-glibc217-x86_64/blender'
 BLENDER_PATH = BLENDER_PATH_2_81
 OUT_PATH = '/local/vondrick/skm2167/CATER_OUT'
+OUTPUT_SCENE_FILE_PATH = '/local/vondrick/skm2167/CATER_OUT/CLEVR_scenes.json'
 CAM_MOTION = False
 MAX_MOTIONS = 2
-
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Launch blender')
@@ -33,6 +33,7 @@ def run_blender(gpu_id):
     # Thanks to Ishan Misra for providing the singularity file
     sleep_time = 1 + int(np.random.random() * 5)  # upto 6 seconds
     subprocess.call('sleep {}'.format(sleep_time), shell=True)
+
     cmd = '''
         CUDA_VISIBLE_DEVICES="{gpu_id}" \
             {blender_path} \
@@ -43,14 +44,21 @@ def run_blender(gpu_id):
             --save_blendfiles 1 \
             {cam_motion} \
             {max_motions} \
-            --output_dir {output_dir}
+            --output_dir {output_dir} \
+            --output_scene_file {output_scene_file} \
+            --fps 24 \
+            --render_num_samples 32 \
+            --start_idx 5500
     '''
+
     final_cmd = cmd.format(
         gpu_id=gpu_id,
+        output_dir=OUT_PATH,
+        output_scene_file=OUTPUT_SCENE_FILE_PATH,
         cam_motion='--random_camera' if CAM_MOTION else '',
         max_motions='--max_motions={}'.format(MAX_MOTIONS),
-        blender_path=BLENDER_PATH,
-        output_dir=OUT_PATH)
+        blender_path=BLENDER_PATH)
+
     print('Running {}'.format(final_cmd))
     subprocess.call(final_cmd, shell=True)
 
